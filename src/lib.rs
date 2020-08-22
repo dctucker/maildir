@@ -3,7 +3,7 @@ use std::fmt;
 use std::fs;
 use std::io::prelude::*;
 use std::ops::Deref;
-use std::os::unix::fs::MetadataExt;
+// use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::time;
 
@@ -27,14 +27,6 @@ impl fmt::Display for MailEntryError {
 }
 
 impl error::Error for MailEntryError {
-    fn description(&self) -> &str {
-        match *self {
-            MailEntryError::IOError(ref err) => err.description(),
-            MailEntryError::ParseError(ref err) => err.description(),
-            MailEntryError::DateError(ref msg) => msg,
-        }
-    }
-
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match *self {
             MailEntryError::IOError(ref err) => Some(err),
@@ -214,7 +206,12 @@ impl Iterator for MailEntries {
                 let (id, flags) = match self.subfolder {
                     Subfolder::New => (Some(filename.as_str()), Some("")),
                     Subfolder::Cur => {
-                        let mut iter = filename.split(":2,");
+                        let mut iter;
+                        if cfg!(windows) {
+                            iter = filename.split("\u{f022}2,");
+                        } else {
+                            iter = filename.split(":2,");
+                        }
                         (iter.next(), iter.next())
                     }
                 };
@@ -261,16 +258,6 @@ impl fmt::Display for MaildirError {
 }
 
 impl error::Error for MaildirError {
-    fn description(&self) -> &str {
-        use MaildirError::*;
-
-        match *self {
-            Io(ref e) => e.description(),
-            Utf8(ref e) => e.description(),
-            Time(ref e) => e.description(),
-        }
-    }
-
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         use MaildirError::*;
 
@@ -535,14 +522,14 @@ impl Maildir {
             Subfolder::Cur => "cur",
         });
         let id = format!(
-            "{}.M{}P{}V{}I{}.{},S={}",
+            "{}.M{}P{}.{},S={}",
             ts.as_secs(),
             ts.subsec_nanos(),
             pid,
-            meta.dev(),
-            meta.ino(),
+            //meta.dev(),
+            //meta.ino(),
             hostname.to_string_lossy(),
-            meta.size(),
+            meta.len(),
         );
         newpath.push(format!("{}{}", id, info));
         std::fs::rename(tmppath, newpath)?;
